@@ -6,14 +6,16 @@ import numpy as np
 
 from sklearn.model_selection import StratifiedShuffleSplit
 
-import flast
+import flast2
 
 
-def flastKNN(outDir, projectBasePath, projectName, kf, dim, eps, k, sigma, params):
+def flastKNN(outDir, projectBasePath, projectList, kf, dim, eps, k, sigma, params):
     v0 = time.perf_counter()
-    dataPointsFlaky, dataPointsNonFlaky = flast.getDataPointsInfo(projectBasePath, projectName)
+    dataPointsFlaky = []
+    dataPointsNonFlaky = []
+    dataPointsFlaky, dataPointsNonFlaky = flast2.retrieveAllData(projectBasePath, projectList)
     dataPoints = dataPointsFlaky + dataPointsNonFlaky
-    Z = flast.flastVectorization(dataPoints, dim=dim, eps=eps)
+    Z = flast2.flastVectorization(dataPoints, dim=dim, eps=eps)
     dataPointsList = np.array([Z[i].toarray() for i in range(Z.shape[0])])
     dataLabelsList = np.array([1]*len(dataPointsFlaky) + [0]*len(dataPointsNonFlaky))
     v1 = time.perf_counter()
@@ -52,10 +54,10 @@ def flastKNN(outDir, projectBasePath, projectName, kf, dim, eps, k, sigma, param
         nSamplesTestData, nxTest, nyTest = testData.shape
         testData = testData.reshape((nSamplesTestData, nxTest * nyTest))
 
-        trainTime, testTime, predictLabels = flast.flastClassification(trainData, trainLabels, testData, sigma, k, params)
+        trainTime, testTime, predictLabels = flast2.flastClassification(trainData, trainLabels, testData, sigma, k, params)
         preparationTime = (vecTime * len(trainData) / len(dataPoints)) + trainTime
         predictionTime = (vecTime / len(dataPoints)) + (testTime / len(testData))
-        (precision, recall) = flast.computeResults(testLabels, predictLabels)
+        (precision, recall) = flast2.computeResults(testLabels, predictLabels)
 
         print(precision, recall)
         if precision != "-":
@@ -82,6 +84,9 @@ def flastKNN(outDir, projectBasePath, projectName, kf, dim, eps, k, sigma, param
 
 if __name__ == "__main__":
     projectBasePath = "dataset"
+    # projectList = [
+    #     "achilles",
+    # ]
     projectList = [
         "achilles",
         "alluxio-tachyon",
@@ -98,10 +103,10 @@ if __name__ == "__main__":
         "wro4j",
     ]
     outDir = "results/"
-    outFile = "eff-eff.csv"
+    outFile = "eff-eff2.csv"
     os.makedirs(outDir, exist_ok=True)
     with open(os.path.join(outDir, outFile), "w") as fo:
-        fo.write("dataset,flakyTrain,nonFlakyTrain,flakyTest,nonFlakyTest,k,sigma,precision,recall,storage,preparationTime,predictionTime\n")
+        fo.write("flakyTrain,nonFlakyTrain,flakyTest,nonFlakyTest,k,sigma,precision,recall,storage,preparationTime,predictionTime\n")
 
     numSplit = 30
     testSetSize = 0.2
@@ -111,10 +116,18 @@ if __name__ == "__main__":
     dim = 0  # number of dimensions (0: JL with error eps)
     eps = 0.3  # JL eps
     params = { "algorithm": "brute", "metric": "cosine", "weights": "distance" }
+    
+    # for k in [3, 7]:
+    #     for sigma in [0.5, 0.95]:
+    #         for projectName in projectList:
+    #             print(projectName.upper(), "FLAST", k, sigma)
+    #             (flakyTrain, nonFlakyTrain, flakyTest, nonFlakyTest, avgP, avgR, storage, avgTPrep, avgTPred) = flastKNN(outDir, projectBasePath, projectName, kf, dim, eps, k, sigma, params)
+    #             with open(os.path.join(outDir, outFile), "a") as fo:
+    #                 fo.write("{},{},{},{},{},{},{},{},{},{},{},{}\n".format(projectName, flakyTrain, nonFlakyTrain, flakyTest, nonFlakyTest, k, sigma, avgP, avgR, storage, avgTPrep, avgTPred))
+
     for k in [3, 7]:
         for sigma in [0.5, 0.95]:
-            for projectName in projectList:
-                print(projectName.upper(), "FLAST", k, sigma)
-                (flakyTrain, nonFlakyTrain, flakyTest, nonFlakyTest, avgP, avgR, storage, avgTPrep, avgTPred) = flastKNN(outDir, projectBasePath, projectName, kf, dim, eps, k, sigma, params)
-                with open(os.path.join(outDir, outFile), "a") as fo:
-                    fo.write("{},{},{},{},{},{},{},{},{},{},{},{}\n".format(projectName, flakyTrain, nonFlakyTrain, flakyTest, nonFlakyTest, k, sigma, avgP, avgR, storage, avgTPrep, avgTPred))
+            print("FLAST", k, sigma)
+            (flakyTrain, nonFlakyTrain, flakyTest, nonFlakyTest, avgP, avgR, storage, avgTPrep, avgTPred) = flastKNN(outDir, projectBasePath, projectList, kf, dim, eps, k, sigma, params)
+            with open(os.path.join(outDir, outFile), "a") as fo:
+                fo.write("{},{},{},{},{},{},{},{},{},{},{}\n".format(flakyTrain, nonFlakyTrain, flakyTest, nonFlakyTest, k, sigma, avgP, avgR, storage, avgTPrep, avgTPred))

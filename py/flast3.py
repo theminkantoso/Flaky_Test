@@ -12,6 +12,24 @@ from sklearn.random_projection import SparseRandomProjection
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import precision_score, recall_score
 
+def retrieveDataSpecialLabels(projectBasePath, projectList):
+    i = 0
+    flakies = []
+    non_flakies = []
+    labels_flakies = []
+    labels_nonflakies = []
+    for projectName in projectList:
+        dataPointsFlaky, dataPointsNonFlaky = getDataPointsInfo(projectBasePath, projectName)
+        for k in range(len(dataPointsFlaky)):
+            labels_flakies.append(i+1)
+        for k in range(len(dataPointsNonFlaky)):
+            labels_nonflakies.append(i)
+        flakies = flakies + dataPointsFlaky
+        non_flakies = non_flakies + dataPointsNonFlaky
+        i = i + 2
+    dataPoints = flakies + non_flakies
+    labels = labels_flakies + labels_nonflakies
+    return dataPoints, labels
 
 ###############################################################################
 # read data from file

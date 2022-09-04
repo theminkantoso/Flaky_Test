@@ -1,0 +1,2 @@
+flakyTrain,nonFlakyTrain,flakyTest,nonFlakyTest,precision,recall,storage,preparationTime,predictionTime
+1106.0,21362.0,277.0,5340.0,0.9772295966572097,0.7211793020457279,255910766,707.7501008557002,0.030041286183371905

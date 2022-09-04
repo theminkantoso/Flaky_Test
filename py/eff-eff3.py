@@ -6,16 +6,15 @@ import numpy as np
 
 from sklearn.model_selection import StratifiedShuffleSplit
 
-import flast
+import flast3
 
 
-def flastKNN(outDir, projectBasePath, projectName, kf, dim, eps, k, sigma, params):
+def flastKNN(outDir, dataPoints, labels, index, Z, kf, k, sigma, params, v_start):
     v0 = time.perf_counter()
-    dataPointsFlaky, dataPointsNonFlaky = flast.getDataPointsInfo(projectBasePath, projectName)
-    dataPoints = dataPointsFlaky + dataPointsNonFlaky
-    Z = flast.flastVectorization(dataPoints, dim=dim, eps=eps)
+    v0 = v0 - v_start
+    # Z = flast3.flastVectorization(dataPoints, dim=dim, eps=eps)
     dataPointsList = np.array([Z[i].toarray() for i in range(Z.shape[0])])
-    dataLabelsList = np.array([1]*len(dataPointsFlaky) + [0]*len(dataPointsNonFlaky))
+    dataLabelsList = np.array(labels)
     v1 = time.perf_counter()
     vecTime = v1 - v0
 
@@ -32,8 +31,30 @@ def flastKNN(outDir, projectBasePath, projectName, kf, dim, eps, k, sigma, param
     avgFlakyTrain, avgNonFlakyTrain, avgFlakyTest, avgNonFlakyTest = 0, 0, 0, 0
     successFold, precisionFold = 0, 0
     for (trnIdx, tstIdx) in kf.split(dataPointsList, dataLabelsList):
-        trainData, testData = dataPointsList[trnIdx], dataPointsList[tstIdx]
-        trainLabels, testLabels = dataLabelsList[trnIdx], dataLabelsList[tstIdx]
+        valid = []
+        for i in range(len(tstIdx)):
+            if(dataLabelsList[tstIdx[i]] == (2 * index) or dataLabelsList[tstIdx[i]] == (2 * index + 1)):
+                valid.append(tstIdx[i])
+        valid = np.array(valid)
+        trainData, testData = dataPointsList[trnIdx], dataPointsList[valid]
+        trainLabels_temp, testLabels_temp = dataLabelsList[trnIdx], dataLabelsList[valid]
+        trainLabels = []
+        testLabels = []
+        for i in range(len(trainLabels_temp)):
+            if(trainLabels_temp[i] % 2 == 0):
+                trainLabels.append(0)
+            else:
+                trainLabels.append(1)
+        
+        for i in range(len(testLabels_temp)):
+            if(testLabels_temp[i] % 2 == 0):
+                testLabels.append(0)
+            else:
+                testLabels.append(1)
+        trainLabels = np.array(trainLabels)
+        testLabels = np.array(testLabels)
+
+        
         if sum(trainLabels) == 0 or sum(testLabels) == 0:
             print("Skipping fold...")
             print(" Flaky Train Tests", sum(trainLabels))
@@ -52,10 +73,10 @@ def flastKNN(outDir, projectBasePath, projectName, kf, dim, eps, k, sigma, param
         nSamplesTestData, nxTest, nyTest = testData.shape
         testData = testData.reshape((nSamplesTestData, nxTest * nyTest))
 
-        trainTime, testTime, predictLabels = flast.flastClassification(trainData, trainLabels, testData, sigma, k, params)
+        trainTime, testTime, predictLabels = flast3.flastClassification(trainData, trainLabels, testData, sigma, k, params)
         preparationTime = (vecTime * len(trainData) / len(dataPoints)) + trainTime
         predictionTime = (vecTime / len(dataPoints)) + (testTime / len(testData))
-        (precision, recall) = flast.computeResults(testLabels, predictLabels)
+        (precision, recall) = flast3.computeResults(testLabels, predictLabels)
 
         print(precision, recall)
         if precision != "-":
@@ -97,11 +118,28 @@ if __name__ == "__main__":
         "togglz",
         "wro4j",
     ]
+    projectIndex = {
+       "achilles": 0,
+        "alluxio-tachyon": 1,
+        "ambari": 2,
+        "hadoop": 3,
+        "jackrabbit-oak": 4,
+        "jimfs": 5,
+        "ninja": 6,
+        "okhttp": 7,
+        "oozie": 8,
+        "oryx": 9,
+        "spring-boot": 10,
+        "togglz": 11,
+        "wro4j": 12
+    }
     outDir = "results/"
-    outFile = "eff-eff.csv"
+    outFile = "eff-eff3.csv"
     os.makedirs(outDir, exist_ok=True)
     with open(os.path.join(outDir, outFile), "w") as fo:
         fo.write("dataset,flakyTrain,nonFlakyTrain,flakyTest,nonFlakyTest,k,sigma,precision,recall,storage,preparationTime,predictionTime\n")
+    v0 = time.perf_counter()
+    dataPoints, labels = flast3.retrieveDataSpecialLabels(projectBasePath, projectList)
 
     numSplit = 30
     testSetSize = 0.2
@@ -111,10 +149,14 @@ if __name__ == "__main__":
     dim = 0  # number of dimensions (0: JL with error eps)
     eps = 0.3  # JL eps
     params = { "algorithm": "brute", "metric": "cosine", "weights": "distance" }
+
+    Z = flast3.flastVectorization(dataPoints, dim=dim, eps=eps)
+    
     for k in [3, 7]:
         for sigma in [0.5, 0.95]:
             for projectName in projectList:
                 print(projectName.upper(), "FLAST", k, sigma)
-                (flakyTrain, nonFlakyTrain, flakyTest, nonFlakyTest, avgP, avgR, storage, avgTPrep, avgTPred) = flastKNN(outDir, projectBasePath, projectName, kf, dim, eps, k, sigma, params)
+                (flakyTrain, nonFlakyTrain, flakyTest, nonFlakyTest, avgP, avgR, storage, avgTPrep, avgTPred) = flastKNN(outDir, dataPoints, labels, projectIndex[projectName], Z, kf, k, sigma, params, v0)
                 with open(os.path.join(outDir, outFile), "a") as fo:
                     fo.write("{},{},{},{},{},{},{},{},{},{},{},{}\n".format(projectName, flakyTrain, nonFlakyTrain, flakyTest, nonFlakyTest, k, sigma, avgP, avgR, storage, avgTPrep, avgTPred))
+
