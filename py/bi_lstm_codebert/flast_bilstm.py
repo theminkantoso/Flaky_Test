@@ -8,9 +8,12 @@ def retrieveAllData(projectBasePath, projectList):
     non_flakies = []
     for projectName in projectList:
         dataPointsFlaky, dataPointsNonFlaky = getDataPointsInfo(projectBasePath, projectName)
+        # print("DEBUG FLAKY", len(dataPointsFlaky))
+        # print("DEBUG NONFLAKY", len(dataPointsNonFlaky))
         flakies = flakies + dataPointsFlaky
         non_flakies = non_flakies + dataPointsNonFlaky
     return flakies, non_flakies
+
 
 ###############################################################################
 # read data from file
@@ -33,12 +36,6 @@ def getDataPointsInfo(projectBasePath, projectName):
     flakyPath = os.path.join(projectPath, "flakyMethods")
     nonFlakyPath = os.path.join(projectPath, "nonFlakyMethods")
     return getDataPoints(flakyPath), getDataPoints(nonFlakyPath)
-
-def getDataPointsBERT(projectBasePath, projectName):
-    dataPointsFlaky, dataPointsNonFlaky = getDataPointsInfo(projectBasePath, projectName)
-    labels = [1]*len(dataPointsFlaky) + [0]*len(dataPointsNonFlaky)
-    dataPoints = dataPointsFlaky + dataPointsNonFlaky
-    return dataPoints, labels, len(dataPointsFlaky), len(dataPointsNonFlaky)
 
 def retrieveDataSpecialLabels(projectBasePath, projectList):
     i = 0
